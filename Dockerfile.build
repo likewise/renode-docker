@@ -1,0 +1,85 @@
+# This docker configuration file lets you easily run Renode and simulate embedded devices
+# on an x86 desktop or laptop. The framework can be used for debugging and automated testing.
+FROM ubuntu:20.04
+
+LABEL maintainer="Leon Woestenberg <leon@sidebranch.com>"
+
+RUN echo 'debconf debconf/frontend select Noninteractive' | debconf-set-selections
+
+#RUN DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true dpkg-reconfigure dash
+
+# Set BASH as the default shell
+RUN echo "dash dash/sh boolean false" | debconf-set-selections
+RUN dpkg-reconfigure dash
+
+ENV TZ=Europe/Amsterdam
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
+
+RUN apt-get update && apt-get upgrade -y && apt-get update && \
+  apt-get install -y \
+  apt-utils sudo nano
+
+# Install main dependencies and some useful tools
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends ca-certificates sudo wget gnupg && rm -rf /var/lib/apt/lists/*
+
+#RUN apt-get update && apt-get upgrade -y && apt-get update && apt-get install -y \
+#  software-properties-common
+
+#RUN apt-get update && apt-get upgrade -y && apt-get update && apt-get install -y \
+#  scala build-essential git make autoconf g++ flex bison
+
+# mono-complete
+RUN apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 3FA7E0328081BFF6A14DA29AA6A19B38D3D831EF && \
+  echo "deb https://download.mono-project.com/repo/ubuntu stable-focal main" | tee /etc/apt/sources.list.d/mono-official-stable.list && \
+  apt-get update && apt-get install -y mono-complete
+
+RUN apt-get update && apt-get install -y build-essential git
+
+# other dependencies for renode on Ubuntu 20.0
+RUN apt-get install -y policykit-1 libgtk2.0-0 screen uml-utilities gtk-sharp2 libc6-dev gcc python3 python3-pip libzmq5
+
+# For building a package after build from source
+#RUN apt-get install -y gem
+
+# make a renode user
+RUN adduser --disabled-password --gecos '' renode
+# give sudo rights
+RUN mkdir -p /etc/sudoers.d
+RUN echo >/etc/sudoers.d/renode 'renode ALL = (ALL) NOPASSWD: SETENV: ALL'
+
+#USER renode
+#WORKDIR /home/renode
+#RUN git clone https://github.com/renode/renode.git && cd renode && ./build.sh && ./build.sh -p
+
+#USER root
+#WORKDIR /root
+
+#RUN apt-get install -y gem
+
+#USER renode
+#WORKDIR /home/renode
+
+#RUN cd renode && ./build.sh -p
+
+
+ARG RENODE_VERSION=1.12.0
+
+# Install Renode (from binary release)
+USER root
+RUN wget https://github.com/renode/renode/releases/download/v${RENODE_VERSION}/renode_${RENODE_VERSION}_amd64.deb && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends ./renode_${RENODE_VERSION}_amd64.deb python3-dev && \
+    rm ./renode_${RENODE_VERSION}_amd64.deb && \
+    rm -rf /var/lib/apt/lists/*
+RUN pip3 install -r /opt/renode/tests/requirements.txt --no-cache-dir
+
+#CMD renode
+
+USER renode
+WORKDIR /home/renode
+
+RUN wget -O- https://github.com/renode/renode/archive/refs/tags/v1.12.0.tar.gz | tar xzf -
+
+CMD /bin/bash
+
