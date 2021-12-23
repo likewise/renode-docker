@@ -67,19 +67,46 @@ ARG RENODE_VERSION=1.12.0
 
 # Install Renode (from binary release)
 USER root
-RUN wget https://github.com/renode/renode/releases/download/v${RENODE_VERSION}/renode_${RENODE_VERSION}_amd64.deb && \
-    apt-get update && \
-    apt-get install -y --no-install-recommends ./renode_${RENODE_VERSION}_amd64.deb python3-dev && \
-    rm ./renode_${RENODE_VERSION}_amd64.deb && \
-    rm -rf /var/lib/apt/lists/*
-RUN pip3 install -r /opt/renode/tests/requirements.txt --no-cache-dir
+WORKDIR /root
 
+#RUN wget https://github.com/renode/renode/releases/download/v${RENODE_VERSION}/renode_${RENODE_VERSION}_amd64.deb && \
+#    apt-get update && \
+#    apt-get install -y --no-install-recommends ./renode_${RENODE_VERSION}_amd64.deb python3-dev && \
+#    rm ./renode_${RENODE_VERSION}_amd64.deb && \
+#    rm -rf /var/lib/apt/lists/*
+#RUN pip3 install -r /opt/renode/tests/requirements.txt --no-cache-dir
+
+RUN apt-get update && apt-get install -y build-essential libssl-dev
+
+RUN wget -O- https://github.com/Kitware/CMake/releases/download/v3.20.0/cmake-3.20.0.tar.gz | tar xzf - && \
+    cd cmake-3.20.0 && ls -al && ./bootstrap && make -j8 install
 #CMD renode
+
+RUN apt-get install -y python3 iverilog gtkwave verilator
+RUN apt-get install -y ruby ruby-dev rpm libarchive-tools
+RUN gem install fpm
+
 
 USER renode
 WORKDIR /home/renode
 
-RUN wget -O- https://github.com/renode/renode/archive/refs/tags/v1.12.0.tar.gz | tar xzf -
+# also deploy source code of renode
+#RUN wget -O- https://github.com/renode/renode/archive/refs/tags/v${RENODE_VERSION}.tar.gz | tar xzf - && cd renode-${RENODE_VERSION} && \
+RUN git clone https://github.com/renode/renode && cd renode && ./build.sh && ./build.sh -p || true
+
+# and verilator integration
+RUN git clone https://github.com/antmicro/renode-verilator-integration.git
+
+USER root
+
+RUN apt-get install -y /home/renode/renode/output/packages/renode_1.12.0_amd64.deb
+RUN echo "export RENODE_ROOT=/home/renode/renode" >> /etc/bash.bashrc
+RUN echo "export RENODE_ROOT=/home/renode/renode" > /etc/profile.d/renode-root
+
+
+
+USER renode
+
 
 CMD /bin/bash
 
